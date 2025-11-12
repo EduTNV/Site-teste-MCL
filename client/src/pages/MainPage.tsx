@@ -230,14 +230,24 @@ export default function MainPage() {
           startIndex: currentImageIndex
         }}
       >
-        <CarouselContent className="h-full">
+        {/* CORREÇÃO 1: Adicionado 'ml-0' para neutralizar o estilo padrão '-ml-4' 
+          do componente CarouselContent, que estava causando o conflito.
+        */}
+        <CarouselContent className="h-full ml-0">
           {images.map((imgSrc, index) => (
+            
+            /* CORREÇÃO 2: Adicionado 'pl-0' para neutralizar o 'pl-4' padrão 
+              do componente CarouselItem.
+            */
             <CarouselItem key={index} className="h-full pl-0">
+              
+              {/* CORREÇÃO 3: Usando style inline para 'objectFit' 
+                para garantir que o navegador não use CSS em cache.
+              */}
               <img
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
-                // MUDANÇA AQUI: Forçando o estilo via inline style
-                className={`w-full h-full bg-black`}
+                className="w-full h-full bg-black"
                 style={{ objectFit: 'contain' }}
               />
             </CarouselItem>
