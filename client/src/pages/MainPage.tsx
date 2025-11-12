@@ -238,7 +238,7 @@ export default function MainPage() {
               <img
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
-                className={`w-full h-full ${isModal ? 'object-contain' : 'object-cover'}`}
+                className={`w-full h-full ${isModal ? 'object-contain' : 'object-contain'}`} // <-- CORREÇÃO AQUI
               />
             </CarouselItem>
           ))}
