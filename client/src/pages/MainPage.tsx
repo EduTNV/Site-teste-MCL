@@ -237,7 +237,7 @@ export default function MainPage() {
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
                 // MUDANÇA AQUI: de object-cover para object-contain
-                className={`w-full h-full object-contain bg-black`} // Adicionei bg-black para as barras pretas
+                className={`w-full h-full object-contain bg-black`}
               />
             </CarouselItem>
           ))}
