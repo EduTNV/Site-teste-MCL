@@ -232,7 +232,7 @@ export default function MainPage() {
       >
         <CarouselContent className="h-full">
           {images.map((imgSrc, index) => (
-            <CarouselItem key={index} className="h-full">
+            <CarouselItem key={index} className="h-full pl-0">
               <img
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
