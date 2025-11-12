@@ -205,8 +205,9 @@ export default function MainPage() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
 
+   // CORREÇÃO: Removido 'timeElapsed' das dependências para evitar loop
     return () => clearInterval(interval);
-  }, [settings.startDate, timeElapsed]);
+  }, [settings.startDate]);
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
