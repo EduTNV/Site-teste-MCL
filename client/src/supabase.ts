@@ -1,8 +1,24 @@
-// client/src/supabase.ts
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = 'https://xwdtgztlzprpexnnzzir.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3ZHRnenRsenBycGV4bm56emlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MDYzMTYsImV4cCI6MjA3ODQ4MjMxNn0.ZXAACIJqilZGoOpoY9l8G7sVWZn7NNmsRdpqnpR1la0'
+// Variáveis de ambiente
+// IMPORTANTE: No Render ou no seu ficheiro .env, as variáveis DEVEM começar com VITE_
+// para que o Vite as injete no código do cliente.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-export const BUCKET_NAME = 'media'
+// Nome do Bucket (Balde) do Supabase Storage.
+// Este nome deve corresponder ao que você criou na aba Storage do Supabase.
+export const BUCKET_NAME = "media"; 
+
+// 1. Verificação de Segurança/Erro
+// Garante que as chaves existem antes de tentar criar o cliente.
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  // Isto irá parar a aplicação se as chaves não forem carregadas corretamente.
+  throw new Error(
+    "As chaves do Supabase (VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY) não estão definidas. Verifique as variáveis de ambiente do Render e o seu .env."
+  );
+}
+
+// 2. Criação do Cliente Supabase
+// Usa as chaves injetadas pelo ambiente.
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
