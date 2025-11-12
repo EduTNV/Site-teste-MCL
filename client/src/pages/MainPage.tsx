@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Settings, X } from "lucide-react";
+// CORREÇÃO: Adicionado Loader2 às importações do lucide-react
+import { Play, Pause, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Settings, X, Loader2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { config } from "@/config";
 import { useLocation } from "wouter";
-import { getAllImages, getAllSongs } from "@/lib/indexeddb";
 import { intervalToDuration } from "date-fns";
-import { useAudioPlayer } from "@/hooks/useAudioPlayer"; // Importa o novo hook
+import { useAudioPlayer } from "@/hooks/useAudioPlayer"; 
 import {
   Carousel,
   CarouselContent,
@@ -15,38 +15,31 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from "@/components/ui/carousel";
+import { supabase, BUCKET_NAME } from "@/supabase";
 
 interface StoredSettings {
-  startDate: {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-  };
+  startDate: Date; 
   images: string[];
   customMessage: string;
   songs: Array<{
     title: string;
     artist: string;
-    file: string; // Isto será um Blob URL
+    file: string; // Isto será um URL público
   }>;
 }
 
-// Guarda os URLs temporários que precisam de ser limpos ao sair da página
-let tempBlobUrls: string[] = [];
+const SETTINGS_ID = 1; // ID fixo da linha na tabela 'settings'
 
 export default function MainPage() {
   const [, setLocation] = useLocation();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // State para a API do carrossel
   const [mainApi, setMainApi] = useState<CarouselApi | undefined>();
   const [modalApi, setModalApi] = useState<CarouselApi | undefined>();
 
   const [settings, setSettings] = useState<StoredSettings>({
-    startDate: config.startDate,
+    startDate: new Date(config.startDate.year, config.startDate.month, config.startDate.day, config.startDate.hour, config.startDate.minute),
     images: config.images,
     customMessage: "",
     songs: config.songs,
@@ -58,10 +51,10 @@ export default function MainPage() {
   const images = settings.images;
   const songs = settings.songs;
   
-  // --- INTEGRAÇÃO DO HOOK: Todas as variáveis e funções de áudio vêm daqui ---
+  // --- INTEGRAÇÃO DO HOOK ---
   const {
     audioRef,
-    currentSong, // Váriavel currentSong é fornecida pelo Hook
+    currentSong,
     currentSongIndex,
     isPlaying,
     currentTime,
@@ -77,18 +70,7 @@ export default function MainPage() {
     handleNextSong,
     formatTime,
   } = useAudioPlayer(songs);
-  // --------------------------------------------------------------------------
   
-  // Configuração inicial - data de início do relacionamento
-  const startDate = new Date(
-    settings.startDate.year,
-    settings.startDate.month,
-    settings.startDate.day,
-    settings.startDate.hour,
-    settings.startDate.minute,
-    0
-  );
-
   // Estado do contador de tempo
   const [timeElapsed, setTimeElapsed] = useState({
     years: 0,
@@ -100,59 +82,69 @@ export default function MainPage() {
   });
 
 
-  // Carregar configurações do localStorage E IndexedDB
+  // Carregar configurações do Supabase (Substitui o IndexedDB e localStorage)
   useEffect(() => {
     async function loadSettings() {
       setIsLoading(true);
-      tempBlobUrls.forEach(URL.revokeObjectURL);
-      tempBlobUrls = [];
 
       let loadedSettings: StoredSettings = {
-        startDate: config.startDate,
+        startDate: new Date(config.startDate.year, config.startDate.month, config.startDate.day, config.startDate.hour, config.startDate.minute),
         images: [...config.images],
         customMessage: "",
         songs: [...config.songs],
       };
 
-      const savedMeta = localStorage.getItem("romanticSiteSettings");
-      if (savedMeta) {
-        const parsedMeta = JSON.parse(savedMeta);
-        loadedSettings = { ...loadedSettings, ...parsedMeta };
+      // 1. Carregar data e mensagem do Banco de Dados
+      try {
+        const { data: settingsData, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', SETTINGS_ID)
+          .single();
+          
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        if (settingsData) {
+          loadedSettings.startDate = new Date(settingsData.start_date);
+          loadedSettings.customMessage = settingsData.custom_message || "";
+        }
+
+      } catch (error) {
+        console.error("Erro ao carregar configurações:", error);
       }
 
+      // 2. Carregar músicas e fotos do Storage
       try {
-        const dbImages = await getAllImages();
-        const dbSongs = await getAllSongs();
-
-        const formattedImages = dbImages.map(img => {
-          if (img.data instanceof Blob) {
-            const url = URL.createObjectURL(img.data);
-            tempBlobUrls.push(url);
-            return url;
-          }
-          return String(img.data);
-        });
-
-        const formattedSongs = dbSongs.map(song => {
-          const fileUrl = (song.data instanceof Blob) ? URL.createObjectURL(song.data) : String(song.data);
-          if (song.data instanceof Blob) tempBlobUrls.push(fileUrl);
+        const { data: files, error } = await supabase
+          .storage
+          .from(BUCKET_NAME)
+          .list();
           
-          return {
-            title: song.title,
-            artist: song.artist,
-            file: fileUrl, 
-          };
-        });
+        if (error) throw error;
 
-        if (formattedImages.length > 0) {
-          loadedSettings.images = formattedImages;
-        }
+        const images: string[] = [];
+        const songs: StoredSettings['songs'] = [];
+        const { data: { publicUrl: BUCKET_URL } } = supabase.storage.from(BUCKET_NAME).getPublicUrl('');
+
+        files.forEach(file => {
+          // URLs públicos precisam de codificação correta
+          const publicUrl = `${BUCKET_URL}/${encodeURIComponent(file.name)}`;
+          
+          if (file.name.endsWith('.mp3') || file.name.endsWith('.wav')) {
+            const parts = file.name.replace(/\.[^/.]+$/, "").split(' - ');
+            const artist = parts.length > 1 ? parts[0] : "Artista desconhecido";
+            const title = parts.length > 1 ? parts[1] : parts[0];
+            songs.push({ title: title, artist: artist, file: publicUrl });
+          } else if (file.name.endsWith('.jpg') || file.name.endsWith('.png') || file.name.endsWith('.jpeg')) {
+            images.push(publicUrl);
+          }
+        });
         
-        if (formattedSongs.length > 0) {
-          loadedSettings.songs = formattedSongs;
-        }
+        if (images.length > 0) loadedSettings.images = images;
+        if (songs.length > 0) loadedSettings.songs = songs;
+
       } catch (error) {
-        console.error("Erro ao carregar dados do IndexedDB:", error);
+        console.error("Erro ao carregar ficheiros:", error);
       }
 
       setSettings(loadedSettings);
@@ -161,21 +153,6 @@ export default function MainPage() {
     }
 
     loadSettings();
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "romanticSiteSettings" || event.key === null) {
-        console.log("Storage changed, reloading settings...");
-        loadSettings();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      tempBlobUrls.forEach(URL.revokeObjectURL);
-      tempBlobUrls = [];
-    };
 
   }, []);
 
@@ -186,13 +163,9 @@ export default function MainPage() {
       if (!api) return;
       setCurrentImageIndex(api.selectedScrollSnap());
     };
-    
     mainApi?.on("select", onSelect);
     if (mainApi) onSelect(mainApi);
-
-    return () => {
-      mainApi?.off("select", onSelect);
-    };
+    return () => { mainApi?.off("select", onSelect); };
   }, [mainApi]);
 
   useEffect(() => {
@@ -200,13 +173,9 @@ export default function MainPage() {
       if (!api) return;
       setCurrentImageIndex(api.selectedScrollSnap());
     };
-    
     modalApi?.on("select", onSelect);
     if (modalApi) onSelect(modalApi);
-
-    return () => {
-      modalApi?.off("select", onSelect);
-    };
+    return () => { modalApi?.off("select", onSelect); };
   }, [modalApi]);
   // --- FIM DA SINCRONIZAÇÃO ---
 
@@ -216,12 +185,12 @@ export default function MainPage() {
     const updateTimer = () => {
       const now = new Date();
       
-      if (now.getTime() < startDate.getTime()) {
+      if (now.getTime() < settings.startDate.getTime()) {
         setTimeElapsed({ years: 0, months: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
         return;
       }
 
-      const duration = intervalToDuration({ start: startDate, end: now });
+      const duration = intervalToDuration({ start: settings.startDate, end: now });
 
       setTimeElapsed({
         years: duration.years || 0,
@@ -237,7 +206,7 @@ export default function MainPage() {
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [startDate]);
+  }, [settings.startDate, timeElapsed]);
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
@@ -245,7 +214,6 @@ export default function MainPage() {
 
   // Renderizar conteúdo do carrossel (agora usa o componente UI)
   const renderCarousel = ({ isModal = false }: { isModal?: boolean }) => {
-    // Verifica se o array de imagens existe e tem itens
     if (!images || images.length === 0) {
       return (
         <div className="w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden flex items-center justify-center group text-white/70 p-4 text-center">
@@ -256,7 +224,6 @@ export default function MainPage() {
     
     return (
       <Carousel
-        // CORREÇÃO ESTRUTURAL: Aplica classes de layout aqui
         className="w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden group relative"
         setApi={isModal ? setModalApi : setMainApi}
         opts={{
@@ -314,14 +281,11 @@ export default function MainPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[oklch(0.2_0.08_250)] to-[oklch(0.15_0.06_260)] flex items-center justify-center">
-        <p className="text-white text-xl font-semibold">A carregar...</p>
+        <Loader2 className="h-8 w-8 text-white animate-spin" />
       </div>
     );
   }
 
-  // **CORREÇÃO: A declaração duplicada foi removida.**
-  // const currentSong = songs[currentSongIndex] || { title: "Sem música", artist: "Adicione músicas nas configurações", file: "" };
-  
   const safeImageIndex = (currentImageIndex || 0) % (images.length || 1);
 
   return (
@@ -457,7 +421,6 @@ export default function MainPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  // CORREÇÃO: Passa o argumento esperado
                   onClick={() => handleNextSong()}
                   className="text-white hover:bg-white/20 h-7 w-7 sm:h-8 sm:w-8"
                   disabled={songs.length <= 1}
@@ -524,7 +487,7 @@ export default function MainPage() {
           {/* Contador de Tempo - Uma Linha Compacta */}
           <div className="bg-white/10 backdrop-blur-lg rounded-xl sm:rounded-2xl p-2.5 sm:p-3 shadow-2xl">
             <div className="text-center space-y-1.5">
-              <h3 className="text-xs sm:text-sm font-semibold font-romantic">
+              <h3 className="text-xs sm:text-sm font-semibold">
                 {config.counterText}
               </h3>
 
@@ -577,7 +540,7 @@ export default function MainPage() {
           {/* Mensagem Personalizada */}
           {settings.customMessage && (
             <div className="bg-white/10 backdrop-blur-lg rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xl text-center">
-              <p className="text-sm sm:text-base text-white/90 italic font-romantic">
+              <p className="text-sm sm:text-base text-white/90 italic">
                 {settings.customMessage}
               </p>
             </div>

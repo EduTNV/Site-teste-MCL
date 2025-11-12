@@ -1,21 +1,14 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Upload, Trash2, Music } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Music, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import {
-  saveImage,
-  getAllImages,
-  deleteImage,
-  saveSong,
-  getAllSongs,
-  deleteSong,
-  clearAllData,
-} from "@/lib/indexeddb";
-import { toast } from "sonner"; // Importa o toast
-import { Calendar } from "@/components/ui/calendar"; // Importa o Calendário
-import { Input } from "@/components/ui/input"; // Importa o Input
-import { config } from "@/config"; // Importa a config padrão
+import { toast } from "sonner";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { config } from "@/config";
+import { supabase, BUCKET_NAME } from "@/supabase"; // Importa o Supabase
 
+// Tipos de dados
 interface StoredSettings {
   startDate: {
     year: number;
@@ -26,13 +19,11 @@ interface StoredSettings {
   };
   customMessage: string;
 }
+type ImageState = { id: string; name: string; url: string };
+type SongState = { id: string; name: string; title: string; artist: string; url: string };
 
-// ------ TIPOS PARA OS NOSSOS ESTADOS ------
-type ImageState = { id: string; data: string };
-type SongState = { id: string; title: string; artist: string; data: string };
-
-// Guarda os URLs temporários para limpar
-let tempBlobUrls: string[] = [];
+// ID fixo da linha na tabela 'settings'. Como só temos 1 site, usamos 1.
+const SETTINGS_ID = 1;
 
 export default function Settings() {
   const [, setLocation] = useLocation();
@@ -41,7 +32,6 @@ export default function Settings() {
     customMessage: "",
   });
 
-  // Estado local para o componente de calendário
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(
       config.startDate.year,
@@ -55,84 +45,97 @@ export default function Settings() {
   const [newSongTitle, setNewSongTitle] = useState("");
   const [newSongArtist, setNewSongArtist] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Função para criar URLs temporários para Blobs (ficheiros)
-  const createBlobUrl = (blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    tempBlobUrls.push(url); // Adiciona ao array para limpeza futura
-    return url;
-  }
-
-  // Carregar configurações ao montar
+  // --- Funções de Carregamento de Dados ---
   useEffect(() => {
-    // Limpa URLs antigos antes de carregar novos
-    tempBlobUrls.forEach(URL.revokeObjectURL);
-    tempBlobUrls = [];
+    loadAllData();
+  }, []);
 
-    const loadData = async () => {
-      try {
-        // Carregar metadados do localStorage
-        const saved = localStorage.getItem("romanticSiteSettings");
-        if (saved) {
-          const parsed = JSON.parse(saved) as StoredSettings;
-          setSettings(parsed);
-          setSelectedDate(
-            new Date(
-              parsed.startDate.year,
-              parsed.startDate.month,
-              parsed.startDate.day
-            )
-          );
-        } else {
-          // Se não houver nada salvo, usa a data padrão
-          setSelectedDate(new Date(config.startDate.year, config.startDate.month, config.startDate.day));
-        }
+  const loadAllData = async () => {
+    setIsLoading(true);
+    const loadingToast = toast.loading("A carregar configurações...");
 
-        // Carregar imagens do IndexedDB
-        const images = await getAllImages();
-        const imagesWithUrls = images.map(img => ({
-          id: img.id,
-          // CORREÇÃO: Verifica se é um Blob (novo) ou string (antigo)
-          data: (img.data instanceof Blob) ? createBlobUrl(img.data) : String(img.data) 
-        }));
-        setUploadedImages(imagesWithUrls);
+    try {
+      // Carregar data e mensagem
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', SETTINGS_ID) // Seleciona a linha com o ID 1
+        .single(); // Espera apenas um resultado
 
-        // Carregar músicas do IndexedDB
-        const songs = await getAllSongs();
-        const songsWithUrls = songs.map(song => ({
-          ...song,
-          // CORREÇÃO: Verifica se é um Blob (novo) ou string (antigo)
-          data: (song.data instanceof Blob) ? createBlobUrl(song.data) : String(song.data)
-        }));
-        setUploadedSongs(songsWithUrls);
-
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        toast.error("Erro ao carregar os seus dados.");
-      } finally {
-        setIsLoading(false);
+      if (settingsError && settingsError.code !== 'PGRST116') { // Ignora erro "linha não encontrada"
+        throw settingsError;
       }
-    };
+      
+      if (settingsData) {
+        const dbDate = new Date(settingsData.start_date);
+        setSettings({
+          startDate: {
+            year: dbDate.getFullYear(),
+            month: dbDate.getMonth(),
+            day: dbDate.getDate(),
+            hour: dbDate.getHours(),
+            minute: dbDate.getMinutes(),
+          },
+          customMessage: settingsData.custom_message || "",
+        });
+        setSelectedDate(dbDate);
+      } else {
+        // Se não houver dados, usa os padrões
+        setSelectedDate(new Date(config.startDate.year, config.startDate.month, config.startDate.day));
+      }
 
-    loadData();
+      // Carregar ficheiros (fotos e músicas)
+      const { data: files, error: filesError } = await supabase
+        .storage
+        .from(BUCKET_NAME)
+        .list();
+        
+      if (filesError) throw filesError;
 
-    // Cleanup: Revogar os URLs temporários ao sair da página
-    return () => {
-      tempBlobUrls.forEach(URL.revokeObjectURL);
-      tempBlobUrls = [];
-    };
-  }, []); // Executa apenas uma vez
+      const images: ImageState[] = [];
+      const songs: SongState[] = [];
+      const { data: { publicUrl: BUCKET_URL } } = supabase.storage.from(BUCKET_NAME).getPublicUrl('');
+
+      files.forEach(file => {
+        const publicUrl = `${BUCKET_URL}/${file.name}`;
+        if (file.name.endsWith('.mp3') || file.name.endsWith('.wav')) {
+          // Extrai título e artista do nome (ex: "Artista - Titulo.mp3")
+          const parts = file.name.replace(/\.[^/.]+$/, "").split(' - ');
+          const artist = parts.length > 1 ? parts[0] : "Artista desconhecido";
+          const title = parts.length > 1 ? parts[1] : parts[0];
+          
+          songs.push({ id: file.id, name: file.name, title, artist, url: publicUrl });
+        } else if (file.name.endsWith('.jpg') || file.name.endsWith('.png') || file.name.endsWith('.jpeg')) {
+          images.push({ id: file.id, name: file.name, url: publicUrl });
+        }
+      });
+
+      setUploadedImages(images);
+      setUploadedSongs(songs);
+      
+      toast.success("Dados carregados!", { id: loadingToast });
+
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+      toast.error("Erro ao carregar os seus dados.", { id: loadingToast });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Funções de Alteração de Dados ---
 
   const handleDateSelect = (day: Date | undefined) => {
     if (day) {
-      setSelectedDate(day); // Atualiza o UI do calendário
-      // Atualiza o estado de 'settings' que será salvo
+      setSelectedDate(day);
       setSettings((prev) => ({
         ...prev,
         startDate: {
           ...prev.startDate,
           year: day.getFullYear(),
-          month: day.getMonth(), // 0-11
+          month: day.getMonth(),
           day: day.getDate(),
         },
       }));
@@ -141,16 +144,8 @@ export default function Settings() {
 
   const handleTimeChange = (field: "hour" | "minute", value: string) => {
     let numValue = parseInt(value) || 0;
-    
-    // Validação
-    if (field === "hour") {
-      if (numValue > 23) numValue = 23;
-      if (numValue < 0) numValue = 0;
-    }
-    if (field === "minute") {
-      if (numValue > 59) numValue = 59;
-      if (numValue < 0) numValue = 0;
-    }
+    if (field === "hour" && (numValue > 23 || numValue < 0)) numValue = 0;
+    if (field === "minute" && (numValue > 59 || numValue < 0)) numValue = 0;
 
     setSettings((prev) => ({
       ...prev,
@@ -172,27 +167,24 @@ export default function Settings() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Feedback de Upload: Mostra o Toast de carregamento
+    setIsUploading(true);
     const uploadToast = toast.loading(`Adicionando ${files.length} foto(s)...`);
 
     try {
-      const newImages: ImageState[] = [];
-      const fileList = Array.from(files); // Converte para Array
+      const uploadPromises = Array.from(files).map(file => {
+        const fileName = `image-${Date.now()}-${file.name}`;
+        return supabase.storage.from(BUCKET_NAME).upload(fileName, file);
+      });
 
-      for (const file of fileList) {
-        const imageId = `image-${Date.now()}-${Math.random()}`;
-        await saveImage(imageId, file); // Salva o Blob
-        const imageUrl = createBlobUrl(file); // Cria URL temporário
-        newImages.push({ id: imageId, data: imageUrl });
-      }
-
-      setUploadedImages((prev) => [...prev, ...newImages]);
-      // Feedback de Upload: Mostra o Toast de sucesso
+      await Promise.all(uploadPromises);
+      await loadAllData(); // Recarrega tudo para mostrar os novos ficheiros
       toast.success("Foto(s) adicionada(s)!", { id: uploadToast });
+
     } catch (error) {
-      console.error("Erro ao fazer upload de imagem:", error);
-      // Feedback de Upload: Mostra o Toast de erro
-      toast.error("Erro ao adicionar foto(s). Tente novamente.", { id: uploadToast });
+      console.error("Erro no upload da imagem:", error);
+      toast.error("Erro ao adicionar foto(s).", { id: uploadToast });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -200,121 +192,108 @@ export default function Settings() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Feedback de Upload: Mostra o Toast de carregamento
+    setIsUploading(true);
     const uploadToast = toast.loading(`Adicionando ${files.length} música(s)...`);
 
     try {
-      const newSongs: SongState[] = [];
-      const fileList = Array.from(files);
-
-      for (const file of fileList) {
+      const uploadPromises = Array.from(files).map(file => {
         const title = newSongTitle || file.name.replace(/\.[^/.]+$/, "");
         const artist = newSongArtist || "Artista desconhecido";
-        const songId = `song-${Date.now()}-${Math.random()}`;
+        // Formata o nome para "Artista - Titulo.mp3" para ser fácil de ler
+        const fileName = `${artist} - ${title}.${file.name.split('.').pop()}`;
+        
+        return supabase.storage.from(BUCKET_NAME).upload(fileName, file);
+      });
 
-        await saveSong(songId, title, artist, file);
+      await Promise.all(uploadPromises);
+      await loadAllData(); // Recarrega tudo
 
-        const songUrl = createBlobUrl(file);
-        newSongs.push({ id: songId, title, artist, data: songUrl });
-      }
-
-      setUploadedSongs((prev) => [...prev, ...newSongs]);
       setNewSongTitle("");
       setNewSongArtist("");
-      // Feedback de Upload: Mostra o Toast de sucesso
       toast.success("Música(s) adicionada(s)!", { id: uploadToast });
 
     } catch (error) {
-      console.error("Erro ao fazer upload de música:", error);
-      // Feedback de Upload: Mostra o Toast de erro
-      toast.error("Erro ao adicionar música(s). Tente novamente.", { id: uploadToast });
+      console.error("Erro no upload da música:", error);
+      toast.error("Erro ao adicionar música(s).", { id: uploadToast });
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  const handleDeleteImage = async (id: string) => {
+  const handleDelete = async (fileName: string, type: "Foto" | "Música") => {
+    if (!confirm(`Tem certeza que deseja apagar ${type.toLowerCase()}: "${fileName}"?`)) return;
+
+    const deleteToast = toast.loading(`A remover ${type.toLowerCase()}...`);
     try {
-      await deleteImage(id);
-      const imageToRemove = uploadedImages.find((img) => img.id === id);
-      if (imageToRemove) {
-        URL.revokeObjectURL(imageToRemove.data);
-      }
-      setUploadedImages((prev) => prev.filter((img) => img.id !== id));
-      toast.success("Foto removida.");
+      await supabase.storage.from(BUCKET_NAME).remove([fileName]);
+      await loadAllData(); // Recarrega a lista
+      toast.success(`${type} removida!`, { id: deleteToast });
     } catch (error) {
-      console.error("Erro ao deletar imagem:", error);
-      toast.error("Erro ao remover foto.");
+      console.error(`Erro ao deletar ${type}:`, error);
+      toast.error(`Erro ao remover ${type.toLowerCase()}.`, { id: deleteToast });
     }
   };
 
-  const handleDeleteSong = async (id: string) => {
-    try {
-      await deleteSong(id);
-      const songToRemove = uploadedSongs.find((song) => song.id === id);
-      if (songToRemove) {
-        URL.revokeObjectURL(songToRemove.data);
-      }
-      setUploadedSongs((prev) => prev.filter((song) => song.id !== id));
-      toast.success("Música removida.");
-    } catch (error) {
-      console.error("Erro ao deletar música:", error);
-      toast.error("Erro ao remover música.");
-    }
-  };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const saveToast = toast.loading("A salvar configurações...");
     try {
-      localStorage.setItem("romanticSiteSettings", JSON.stringify(settings));
-      // Dispara um evento de storage para que a MainPage (se aberta) possa atualizar
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: "romanticSiteSettings",
-          newValue: JSON.stringify(settings),
-        })
-      ); 
-      toast.success("Configurações salvas com sucesso!");
+      const { year, month, day, hour, minute } = settings.startDate;
+      // Cria a data em formato ISO 8601 (que o Supabase entende)
+      const dateString = new Date(year, month, day, hour, minute).toISOString();
+
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ 
+          id: SETTINGS_ID, // Chave primária
+          start_date: dateString, 
+          custom_message: settings.customMessage 
+        });
+
+      if (error) throw error;
+      
+      toast.success("Configurações salvas com sucesso!", { id: saveToast });
     } catch (error) {
       console.error("Erro ao salvar configurações:", error);
-      toast.error("Erro ao salvar as configurações.");
+      toast.error("Erro ao salvar as configurações.", { id: saveToast });
     }
   };
 
   const handleReset = async () => {
-    if (confirm("Tem certeza que deseja apagar TUDO? (Incluindo fotos e músicas)")) {
-      try {
-        const defaultSettings: StoredSettings = {
-          startDate: config.startDate,
-          customMessage: "",
-        };
+    if (!confirm("Tem certeza que deseja apagar TUDO? (Incluindo fotos, músicas e a data)")) return;
 
-        setSettings(defaultSettings);
-        setSelectedDate(new Date(config.startDate.year, config.startDate.month, config.startDate.day));
-        
-        // Limpa URLs temporários
-        uploadedImages.forEach(img => URL.revokeObjectURL(img.data));
-        uploadedSongs.forEach(song => URL.revokeObjectURL(song.data));
+    const resetToast = toast.loading("A resetar tudo...");
+    try {
+      // Apaga a linha da tabela de settings
+      await supabase.from('settings').delete().eq('id', SETTINGS_ID);
 
-        setUploadedImages([]);
-        setUploadedSongs([]);
-
-        localStorage.setItem("romanticSiteSettings", JSON.stringify(defaultSettings));
-        await clearAllData();
-        
-        // Dispara o evento de storage para atualizar a MainPage
-        window.dispatchEvent(new StorageEvent("storage", { key: "romanticSiteSettings" }));
-        toast.success("Configurações resetadas!");
-      } catch (error) {
-        console.error("Erro ao resetar:", error);
-        toast.error("Erro ao resetar as configurações.");
+      // Apaga todos os ficheiros do storage
+      const { data: files } = await supabase.storage.from(BUCKET_NAME).list();
+      if (files && files.length > 0) {
+        const fileNames = files.map(file => file.name);
+        await supabase.storage.from(BUCKET_NAME).remove(fileNames);
       }
+      
+      // Reseta o estado local
+      setSettings({
+        startDate: config.startDate,
+        customMessage: "",
+      });
+      setSelectedDate(new Date(config.startDate.year, config.startDate.month, config.startDate.day));
+      setUploadedImages([]);
+      setUploadedSongs([]);
+
+      toast.success("Site resetado para os padrões!", { id: resetToast });
+    } catch (error) {
+      console.error("Erro ao resetar:", error);
+      toast.error("Erro ao resetar as configurações.", { id: resetToast });
     }
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[oklch(0.2_0.08_250)] to-[oklch(0.15_0.06_260)] p-4 sm:p-6 flex items-center justify-center">
-        <div className="text-white text-center">
-          <p className="text-xl font-semibold">Carregando configurações...</p>
-        </div>
+        <Loader2 className="h-8 w-8 text-white animate-spin" />
       </div>
     );
   }
@@ -423,14 +402,14 @@ export default function Settings() {
                 type="text"
                 value={newSongTitle}
                 onChange={(e) => setNewSongTitle(e.target.value)}
-                placeholder="Título da música (opcional)"
+                placeholder="Título da música"
                 className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:border-white/40"
               />
               <Input
                 type="text"
                 value={newSongArtist}
                 onChange={(e) => setNewSongArtist(e.target.value)}
-                placeholder="Artista (opcional)"
+                placeholder="Artista"
                 className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-white/50 focus:outline-none focus:border-white/40"
               />
             </div>
@@ -444,10 +423,11 @@ export default function Settings() {
                 onChange={handleSongUpload}
                 className="hidden"
                 id="song-upload"
+                disabled={isUploading}
               />
-              <label htmlFor="song-upload" className="cursor-pointer block">
-                <Music className="h-8 w-8 text-white/70 mx-auto mb-2" />
-                <p className="text-white font-medium">Clique para adicionar músicas</p>
+              <label htmlFor="song-upload" className={`cursor-pointer block ${isUploading ? 'opacity-50' : ''}`}>
+                {isUploading ? <Loader2 className="h-8 w-8 text-white/70 mx-auto mb-2 animate-spin" /> : <Music className="h-8 w-8 text-white/70 mx-auto mb-2" />}
+                <p className="text-white font-medium">{isUploading ? 'A carregar...' : 'Clique para adicionar músicas'}</p>
                 <p className="text-white/50 text-sm">ou arraste arquivos aqui (MP3, WAV, etc)</p>
               </label>
             </div>
@@ -470,7 +450,7 @@ export default function Settings() {
                         <p className="text-white/70 text-sm truncate">{song.artist}</p>
                       </div>
                       <button
-                        onClick={() => handleDeleteSong(song.id)}
+                        onClick={() => handleDelete(song.name, "Música")}
                         className="ml-2 bg-red-500/80 hover:bg-red-600 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                       >
                         <Trash2 className="h-4 w-4 text-white" />
@@ -499,10 +479,11 @@ export default function Settings() {
                 onChange={handleImageUpload}
                 className="hidden"
                 id="image-upload"
+                disabled={isUploading}
               />
-              <label htmlFor="image-upload" className="cursor-pointer block">
-                <Upload className="h-8 w-8 text-white/70 mx-auto mb-2" />
-                <p className="text-white font-medium">Clique para adicionar fotos</p>
+              <label htmlFor="image-upload" className={`cursor-pointer block ${isUploading ? 'opacity-50' : ''}`}>
+                {isUploading ? <Loader2 className="h-8 w-8 text-white/70 mx-auto mb-2 animate-spin" /> : <Upload className="h-8 w-8 text-white/70 mx-auto mb-2" />}
+                <p className="text-white font-medium">{isUploading ? 'A carregar...' : 'Clique para adicionar fotos'}</p>
                 <p className="text-white/50 text-sm">ou arraste arquivos aqui</p>
               </label>
             </div>
@@ -518,12 +499,12 @@ export default function Settings() {
                   {uploadedImages.map((image) => (
                     <div key={image.id} className="relative group">
                       <img
-                        src={image.data}
+                        src={image.url}
                         alt="Foto"
                         className="w-full h-32 object-cover rounded-lg"
                       />
                       <button
-                        onClick={() => handleDeleteImage(image.id)}
+                        onClick={() => handleDelete(image.name, "Foto")}
                         className="absolute top-1 right-1 bg-red-500/80 hover:bg-red-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 className="h-4 w-4 text-white" />
