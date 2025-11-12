@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-// CORREÇÃO: Adicionado Loader2 às importações do lucide-react
 import { Play, Pause, SkipBack, SkipForward, Volume2, Shuffle, Repeat, Repeat1, Settings, X, Loader2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { config } from "@/config";
@@ -82,7 +81,7 @@ export default function MainPage() {
   });
 
 
-  // Carregar configurações do Supabase (Substitui o IndexedDB e localStorage)
+  // Carregar configurações do Supabase
   useEffect(() => {
     async function loadSettings() {
       setIsLoading(true);
@@ -111,6 +110,7 @@ export default function MainPage() {
 
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
+        // Não mostrar toast aqui para não interromper a UI no carregamento inicial
       }
 
       // 2. Carregar músicas e fotos do Storage
@@ -127,7 +127,6 @@ export default function MainPage() {
         const { data: { publicUrl: BUCKET_URL } } = supabase.storage.from(BUCKET_NAME).getPublicUrl('');
 
         files.forEach(file => {
-          // URLs públicos precisam de codificação correta
           const publicUrl = `${BUCKET_URL}/${encodeURIComponent(file.name)}`;
           
           if (file.name.endsWith('.mp3') || file.name.endsWith('.wav')) {
@@ -145,6 +144,7 @@ export default function MainPage() {
 
       } catch (error) {
         console.error("Erro ao carregar ficheiros:", error);
+        // Não mostrar toast aqui para não interromper a UI no carregamento inicial
       }
 
       setSettings(loadedSettings);
@@ -154,8 +154,7 @@ export default function MainPage() {
 
     loadSettings();
 
-  }, []);
-
+  }, []); // Executa apenas no mount
 
   // --- SINCRONIZAR O CARROSSEL COM O ESTADO ---
   useEffect(() => {
@@ -205,7 +204,6 @@ export default function MainPage() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
 
-   // CORREÇÃO: Removido 'timeElapsed' das dependências para evitar loop
     return () => clearInterval(interval);
   }, [settings.startDate]);
 
@@ -238,7 +236,8 @@ export default function MainPage() {
               <img
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
-                className={`w-full h-full ${isModal ? 'object-contain' : 'object-contain'}`} // <-- CORREÇÃO AQUI
+                // MUDANÇA AQUI: de object-cover para object-contain
+                className={`w-full h-full object-contain bg-black`} // Adicionei bg-black para as barras pretas
               />
             </CarouselItem>
           ))}
@@ -249,13 +248,11 @@ export default function MainPage() {
           <>
             <CarouselPrevious 
               className={`absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 sm:p-2 transition-all ${
-                // Se NÃO for modal, fica invisível e aparece no hover
                 !isModal && 'opacity-0 group-hover:opacity-100'
               }`} 
             />
             <CarouselNext 
               className={`absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 sm:p-2 transition-all ${
-                // Se NÃO for modal, fica invisível e aparece no hover
                 !isModal && 'opacity-0 group-hover:opacity-100'
               }`} 
             />
