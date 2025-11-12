@@ -110,6 +110,7 @@ export default function MainPage() {
 
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
+        // Não mostrar toast aqui para não interromper a UI no carregamento inicial
       }
 
       // 2. Carregar músicas e fotos do Storage
@@ -143,6 +144,7 @@ export default function MainPage() {
 
       } catch (error) {
         console.error("Erro ao carregar ficheiros:", error);
+        // Não mostrar toast aqui para não interromper a UI no carregamento inicial
       }
 
       setSettings(loadedSettings);
@@ -228,27 +230,26 @@ export default function MainPage() {
           startIndex: currentImageIndex
         }}
       >
-        {/* CORREÇÃO 1: 'ml-0' para neutralizar o estilo padrão do CarouselContent */}
+        {/* CORREÇÃO 1: Adicionado 'ml-0' para neutralizar o estilo padrão '-ml-4' 
+          do componente CarouselContent, que estava causando o conflito.
+        */}
         <CarouselContent className="h-full ml-0">
           {images.map((imgSrc, index) => (
             
-            /* CORREÇÃO 2: 'pl-0' para neutralizar o estilo padrão do CarouselItem */
+            /* CORREÇÃO 2: Adicionado 'pl-0' para neutralizar o 'pl-4' padrão 
+              do componente CarouselItem.
+            */
             <CarouselItem key={index} className="h-full pl-0">
               
-              {/* CORREÇÃO 3: 
-                - Div' interna com 'flex' para centralizar a imagem.
-                - 'bg-black' movido para esta 'div' para criar as barras.
-                - Tag <img> com 'object-contain' e 'max-h-full', 'max-w-full' 
-                  para garantir que ela caiba sem esticar ou cortar.
+              {/* CORREÇÃO 3: Usando style inline para 'objectFit' 
+                para garantir que o navegador não use CSS em cache.
               */}
-              <div className="w-full h-full flex items-center justify-center bg-black">
-                <img
-                  src={imgSrc}
-                  alt={`Foto ${index + 1}`}
-                  className="block object-contain"
-                  style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
-                />
-              </div>
+              <img
+                src={imgSrc}
+                alt={`Foto ${index + 1}`}
+                className="w-full h-full bg-black"
+                style={{ objectFit: 'contain' }}
+              />
             </CarouselItem>
           ))}
         </CarouselContent>
@@ -461,7 +462,6 @@ export default function MainPage() {
                   value={[volume]}
                   max={100}
                   step={1}
-                  // ERRO CORRIGIDO AQUI
                   onValueChange={(value: number[]) => setVolume(value[0])}
                   className="w-full"
                 />
