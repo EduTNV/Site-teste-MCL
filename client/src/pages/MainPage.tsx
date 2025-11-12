@@ -236,8 +236,9 @@ export default function MainPage() {
               <img
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
-                // MUDANÇA AQUI: de object-cover para object-contain
-                className={`w-full h-full object-contain bg-black`}
+                // MUDANÇA AQUI: Forçando o estilo via inline style
+                className={`w-full h-full bg-black`}
+                style={{ objectFit: 'contain' }}
               />
             </CarouselItem>
           ))}
