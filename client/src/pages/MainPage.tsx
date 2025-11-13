@@ -110,7 +110,6 @@ export default function MainPage() {
 
       } catch (error) {
         console.error("Erro ao carregar configurações:", error);
-        // Não mostrar toast aqui para não interromper a UI no carregamento inicial
       }
 
       // 2. Carregar músicas e fotos do Storage
@@ -139,12 +138,13 @@ export default function MainPage() {
           }
         });
         
+        // Apenas substitui as imagens padrão se imagens forem carregadas
         if (images.length > 0) loadedSettings.images = images;
+        // Apenas substitui as músicas padrão se músicas forem carregadas
         if (songs.length > 0) loadedSettings.songs = songs;
 
       } catch (error) {
         console.error("Erro ao carregar ficheiros:", error);
-        // Não mostrar toast aqui para não interromper a UI no carregamento inicial
       }
 
       setSettings(loadedSettings);
@@ -230,25 +230,22 @@ export default function MainPage() {
           startIndex: currentImageIndex
         }}
       >
-        {/* CORREÇÃO 1: Adicionado 'ml-0' para neutralizar o estilo padrão '-ml-4' 
-          do componente CarouselContent, que estava causando o conflito.
-        */}
+        {/* CORREÇÃO 1: 'ml-0' para neutralizar o estilo padrão do CarouselContent */}
         <CarouselContent className="h-full ml-0">
           {images.map((imgSrc, index) => (
             
-            /* CORREÇÃO 2: Adicionado 'pl-0' para neutralizar o 'pl-4' padrão 
-              do componente CarouselItem.
-            */
+            /* CORREÇÃO 2: 'pl-0' para neutralizar o estilo padrão do CarouselItem */
             <CarouselItem key={index} className="h-full pl-0">
               
-              {/* CORREÇÃO 3: Usando style inline para 'objectFit' 
-                para garantir que o navegador não use CSS em cache.
+              {/* CORREÇÃO 3: 
+                Voltamos ao 'object-cover'. Agora que as imagens são CORTADAS
+                no upload (no Settings.tsx) para 16:9, 'object-cover'
+                irá preencher o contêiner perfeitamente sem barras pretas.
               */}
               <img
                 src={imgSrc}
                 alt={`Foto ${index + 1}`}
-                className="w-full h-full bg-black"
-                style={{ objectFit: 'contain' }}
+                className="w-full h-full object-cover"
               />
             </CarouselItem>
           ))}
@@ -497,7 +494,7 @@ export default function MainPage() {
           <div className="bg-white/10 backdrop-blur-lg rounded-xl sm:rounded-2xl p-2.5 sm:p-3 shadow-2xl">
             <div className="text-center space-y-1.5">
               <h3 className="text-xs sm:text-sm font-semibold">
-                {config.counterText}
+                {settings.customMessage || config.counterText}
               </h3>
 
               <div className="flex justify-center items-center gap-1.5 sm:gap-2 flex-wrap text-center">
@@ -546,11 +543,11 @@ export default function MainPage() {
             </div>
           </div>
 
-          {/* Mensagem Personalizada */}
+          {/* Mensagem Personalizada (se o texto do contador for o padrão) */}
           {settings.customMessage && (
             <div className="bg-white/10 backdrop-blur-lg rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-2xl text-center">
               <p className="text-sm sm:text-base text-white/90 italic">
-                {settings.customMessage}
+                {config.counterText} {/* Mostra o texto do contador aqui se a msg personalizada for usada como título */}
               </p>
             </div>
           )}

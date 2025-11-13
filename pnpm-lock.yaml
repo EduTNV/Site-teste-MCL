@@ -148,6 +148,9 @@ importers:
       react-hook-form:
         specifier: ^7.64.0
         version: 7.64.0(react@18.3.1)
+      react-image-crop:
+        specifier: ^11.0.10
+        version: 11.0.10(react@18.3.1)
       react-resizable-panels:
         specifier: ^3.0.6
         version: 3.0.6(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -178,13 +181,13 @@ importers:
     devDependencies:
       '@builder.io/vite-plugin-jsx-loc':
         specifier: ^0.1.1
-        version: 0.1.1(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))
+        version: 0.1.1(vite@5.4.20(@types/node@24.7.0)(lightningcss@1.30.1))
       '@tailwindcss/typography':
         specifier: ^0.5.15
         version: 0.5.19(tailwindcss@4.1.14)
       '@tailwindcss/vite':
         specifier: ^4.1.3
-        version: 4.1.14(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))
+        version: 4.1.14(vite@5.4.20(@types/node@24.7.0)(lightningcss@1.30.1))
       '@types/express':
         specifier: 4.17.21
         version: 4.17.21
@@ -202,7 +205,7 @@ importers:
         version: 19.2.1(@types/react@19.2.2)
       '@vitejs/plugin-react':
         specifier: ^5.0.4
-        version: 5.0.4(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))
+        version: 5.0.4(vite@5.4.20(@types/node@24.7.0)(lightningcss@1.30.1))
       add:
         specifier: ^2.0.6
         version: 2.0.6
@@ -237,8 +240,8 @@ importers:
         specifier: 5.6.3
         version: 5.6.3
       vite:
-        specifier: ^7.1.7
-        version: 7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6)
+        specifier: ^5.2.0
+        version: 5.4.20(@types/node@24.7.0)(lightningcss@1.30.1)
       vite-plugin-manus-runtime:
         specifier: ^0.0.56
         version: 0.0.56
@@ -2344,15 +2347,6 @@ packages:
     resolution: {integrity: sha512-6rxyATwPCkaFIL3JLqw8qXqMpIZ942pTX/tbQFkRsDGblS8tNGtlUauA/+mt6RUfqn/4MoEr+WDkYoIQbibWuQ==}
     engines: {node: '>=6.0.0'}
 
-  fdir@6.5.0:
-    resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
-    engines: {node: '>=12.0.0'}
-    peerDependencies:
-      picomatch: ^3 || ^4
-    peerDependenciesMeta:
-      picomatch:
-        optional: true
-
   finalhandler@1.3.1:
     resolution: {integrity: sha512-6BN9trH7bp3qvnrRyzsBz+g3lZxTNZTbVO2EV1CS0WIcDbawYVdYvGflME/9QP0h0pYlCDBCTjYa9nZzMDpyxQ==}
     engines: {node: '>= 0.8'}
@@ -2968,10 +2962,6 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  picomatch@4.0.3:
-    resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
-    engines: {node: '>=12'}
-
   pkg-types@1.3.1:
     resolution: {integrity: sha512-/Jm5M4RvtBFVkKWRu2BLUTNP8/M2a+UwuAX+ae4770q1qVGtfjG+WTCupoZixokjmHiry8uI+dlY8KXYV5HVVQ==}
 
@@ -3057,6 +3047,11 @@ packages:
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
+
+  react-image-crop@11.0.10:
+    resolution: {integrity: sha512-+5FfDXUgYLLqBh1Y/uQhIycpHCbXkI50a+nbfkB1C0xXXUTwkisHDo2QCB1SQJyHCqIuia4FeyReqXuMDKWQTQ==}
+    peerDependencies:
+      react: '>=16.13.1'
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -3322,10 +3317,6 @@ packages:
   tinyexec@1.0.1:
     resolution: {integrity: sha512-5uC6DDlmeqiOwCPmK9jMSdOuZTh8bU39Ys6yidB+UTt5hfZUPGAypSgFRiEp+jbi9qH40BLDvy85jIU88wKSqw==}
 
-  tinyglobby@0.2.15:
-    resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
-    engines: {node: '>=12.0.0'}
-
   tinypool@1.1.1:
     resolution: {integrity: sha512-Zba82s87IFq9A9XmjiX5uZA/ARWDrB03OHlq+Vw1fSdt0I+4/Kutwy8BP4Y/y/aORMo61FQ0vIb5j44vSo5Pkg==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -3507,46 +3498,6 @@ packages:
       sugarss:
         optional: true
       terser:
-        optional: true
-
-  vite@7.1.9:
-    resolution: {integrity: sha512-4nVGliEpxmhCL8DslSAUdxlB6+SMrhB0a1v5ijlh1xB1nEPuy1mxaHxysVucLHuWryAxLWg6a5ei+U4TLn/rFg==}
-    engines: {node: ^20.19.0 || >=22.12.0}
-    hasBin: true
-    peerDependencies:
-      '@types/node': ^20.19.0 || >=22.12.0
-      jiti: '>=1.21.0'
-      less: ^4.0.0
-      lightningcss: ^1.21.0
-      sass: ^1.70.0
-      sass-embedded: ^1.70.0
-      stylus: '>=0.54.8'
-      sugarss: ^5.0.0
-      terser: ^5.16.0
-      tsx: ^4.8.1
-      yaml: ^2.4.2
-    peerDependenciesMeta:
-      '@types/node':
-        optional: true
-      jiti:
-        optional: true
-      less:
-        optional: true
-      lightningcss:
-        optional: true
-      sass:
-        optional: true
-      sass-embedded:
-        optional: true
-      stylus:
-        optional: true
-      sugarss:
-        optional: true
-      terser:
-        optional: true
-      tsx:
-        optional: true
-      yaml:
         optional: true
 
   vitest@2.1.9:
@@ -3768,10 +3719,10 @@ snapshots:
       estree-walker: 2.0.2
       magic-string: 0.30.19
 
-  '@builder.io/vite-plugin-jsx-loc@0.1.1(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))':
+  '@builder.io/vite-plugin-jsx-loc@0.1.1(vite@5.4.20(@types/node@24.7.0)(lightningcss@1.30.1))':
     dependencies:
       '@builder.io/jsx-loc-internals': 0.0.1
-      vite: 7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6)
+      vite: 5.4.20(@types/node@24.7.0)(lightningcss@1.30.1)
 
   '@chevrotain/cst-dts-gen@11.0.3':
     dependencies:
@@ -4862,12 +4813,12 @@ snapshots:
       postcss-selector-parser: 6.0.10
       tailwindcss: 4.1.14
 
-  '@tailwindcss/vite@4.1.14(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))':
+  '@tailwindcss/vite@4.1.14(vite@5.4.20(@types/node@24.7.0)(lightningcss@1.30.1))':
     dependencies:
       '@tailwindcss/node': 4.1.14
       '@tailwindcss/oxide': 4.1.14
       tailwindcss: 4.1.14
-      vite: 7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6)
+      vite: 5.4.20(@types/node@24.7.0)(lightningcss@1.30.1)
 
   '@tanstack/query-core@4.41.0': {}
 
@@ -5116,7 +5067,7 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
-  '@vitejs/plugin-react@5.0.4(vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6))':
+  '@vitejs/plugin-react@5.0.4(vite@5.4.20(@types/node@24.7.0)(lightningcss@1.30.1))':
     dependencies:
       '@babel/core': 7.28.4
       '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.28.4)
@@ -5124,7 +5075,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.38
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6)
+      vite: 5.4.20(@types/node@24.7.0)(lightningcss@1.30.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -5754,10 +5705,6 @@ snapshots:
   extend@3.0.2: {}
 
   fast-equals@5.3.2: {}
-
-  fdir@6.5.0(picomatch@4.0.3):
-    optionalDependencies:
-      picomatch: 4.0.3
 
   finalhandler@1.3.1:
     dependencies:
@@ -6623,8 +6570,6 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  picomatch@4.0.3: {}
-
   pkg-types@1.3.1:
     dependencies:
       confbox: 0.1.8
@@ -6712,6 +6657,10 @@ snapshots:
       scheduler: 0.27.0
 
   react-hook-form@7.64.0(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+
+  react-image-crop@11.0.10(react@18.3.1):
     dependencies:
       react: 18.3.1
 
@@ -7089,11 +7038,6 @@ snapshots:
 
   tinyexec@1.0.1: {}
 
-  tinyglobby@0.2.15:
-    dependencies:
-      fdir: 6.5.0(picomatch@4.0.3)
-      picomatch: 4.0.3
-
   tinypool@1.1.1: {}
 
   tinyrainbow@1.2.0: {}
@@ -7286,21 +7230,6 @@ snapshots:
       '@types/node': 24.7.0
       fsevents: 2.3.3
       lightningcss: 1.30.1
-
-  vite@7.1.9(@types/node@24.7.0)(jiti@2.6.1)(lightningcss@1.30.1)(tsx@4.20.6):
-    dependencies:
-      esbuild: 0.25.10
-      fdir: 6.5.0(picomatch@4.0.3)
-      picomatch: 4.0.3
-      postcss: 8.5.6
-      rollup: 4.52.4
-      tinyglobby: 0.2.15
-    optionalDependencies:
-      '@types/node': 24.7.0
-      fsevents: 2.3.3
-      jiti: 2.6.1
-      lightningcss: 1.30.1
-      tsx: 4.20.6
 
   vitest@2.1.9(@types/node@24.7.0)(lightningcss@1.30.1):
     dependencies:
